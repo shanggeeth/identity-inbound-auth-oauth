@@ -317,6 +317,11 @@ public class TokenBindingExpiryEventHandler extends AbstractEventHandler {
                         revokeFederatedTokens(consumerKey, user, accessTokenDO, tokenBindingReference);
                     } else if (StringUtils.equalsIgnoreCase(userId, authenticatedUser.getUserId())) {
                         revokeTokens(consumerKey, accessTokenDO, tokenBindingReference);
+                    } else if (authenticatedUser.isFederatedUser() &&
+                            StringUtils.isNotEmpty(authenticatedUser.getAccessingOrganization())) {
+                        /* For organization SSO federated users, the generated user IDs are different when trying to
+                            fetch user ID. */
+                        revokeTokens(consumerKey, accessTokenDO, tokenBindingReference);
                     }
                 } catch (UserIdNotFoundException e) {
                     log.error("User id cannot be found for user: " + authenticatedUser.getLoggableUserId());
