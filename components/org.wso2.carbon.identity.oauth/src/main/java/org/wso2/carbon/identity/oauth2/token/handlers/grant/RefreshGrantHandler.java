@@ -284,13 +284,7 @@ public class RefreshGrantHandler extends AbstractAuthorizationGrantHandler {
         if (isHashDisabled && cacheEnabled) {
             // Remove old access token from the OAuthCache
             String scope = OAuth2Util.buildScopeString(tokReqMsgCtx.getScope());
-            String userId;
-            try {
-                userId = tokReqMsgCtx.getAuthorizedUser().getUserId();
-            } catch (UserIdNotFoundException e) {
-                throw new IdentityOAuth2Exception("User id is not available for user: "
-                        + tokReqMsgCtx.getAuthorizedUser().getLoggableUserId(), e);
-            }
+            String userId = OAuth2Util.resolveAuthenticatedUserId(tokReqMsgCtx.getAuthorizedUser());
             String authenticatedIDP = tokReqMsgCtx.getAuthorizedUser().getFederatedIdPName();
             String accessingOrganization = OAuthConstants.AuthorizedOrganization.NONE;
             if (!StringUtils.isEmpty(oldAccessToken.getAuthorizedUser().getAccessingOrganization())) {

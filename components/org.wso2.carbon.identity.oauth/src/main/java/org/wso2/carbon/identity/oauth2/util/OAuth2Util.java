@@ -5109,4 +5109,21 @@ public class OAuth2Util {
             return IdentityTenantUtil.isTenantQualifiedUrlsEnabled() && IdentityTenantUtil.isTenantedSessionsEnabled();
         }
     }
+
+    public static String resolveAuthenticatedUserId(AuthenticatedUser authenticatedUser)
+            throws IdentityOAuth2Exception {
+
+        if (authenticatedUser.isFederatedUser()
+                && StringUtils.isNotEmpty(authenticatedUser.getAccessingOrganization())) {
+            String userName = MultitenantUtils.getTenantAwareUsername(authenticatedUser.getUserName());
+            return UserCoreUtil.removeDomainFromName(userName);
+        }
+        try {
+            return authenticatedUser.getUserId();
+        }
+        catch (UserIdNotFoundException e) {
+            throw new IdentityOAuth2Exception("User id is not available for user: " +
+                    authenticatedUser.getLoggableUserId(), e);
+        }
+    }
 }

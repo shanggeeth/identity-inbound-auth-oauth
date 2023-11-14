@@ -129,13 +129,7 @@ public abstract class AbstractAuthorizationGrantHandler implements Authorization
 
         String scope = OAuth2Util.buildScopeString(tokReqMsgCtx.getScope());
         String consumerKey = tokReqMsgCtx.getOauth2AccessTokenReqDTO().getClientId();
-        String authorizedUserId;
-        try {
-            authorizedUserId = tokReqMsgCtx.getAuthorizedUser().getUserId();
-        } catch (UserIdNotFoundException e) {
-            throw new IdentityOAuth2Exception(
-                    "User id is not available for user: " + tokReqMsgCtx.getAuthorizedUser().getLoggableUserId(), e);
-        }
+        String authorizedUserId = OAuth2Util.resolveAuthenticatedUserId(tokReqMsgCtx.getAuthorizedUser());
         String authenticatedIDP = OAuth2Util.getAuthenticatedIDP(tokReqMsgCtx.getAuthorizedUser());
         String tokenBindingReference = getTokenBindingReference(tokReqMsgCtx);
         String authorizedOrganization = getAuthorizedOrganization(tokReqMsgCtx);
@@ -569,19 +563,11 @@ public abstract class AbstractAuthorizationGrantHandler implements Authorization
                     }
                 }
 
-                String userId;
-                String authorizedOrganization;
-                try {
-                    userId = tokenToCache.getAuthzUser().getUserId();
-                    authorizedOrganization = tokenToCache.getAuthzUser().getAccessingOrganization();
-                    if (StringUtils.isBlank(authorizedOrganization)) {
-                        authorizedOrganization = OAuthConstants.AuthorizedOrganization.NONE;
-                    }
-                } catch (UserIdNotFoundException e) {
-                    throw new IdentityOAuth2Exception(
-                            "User id is not available for user: " + tokenToCache.getAuthzUser().getLoggableUserId(), e);
+                String userId = OAuth2Util.resolveAuthenticatedUserId(tokenToCache.getAuthzUser());
+                String authorizedOrganization = tokenToCache.getAuthzUser().getAccessingOrganization();
+                if (StringUtils.isBlank(authorizedOrganization)) {
+                    authorizedOrganization = OAuthConstants.AuthorizedOrganization.NONE;
                 }
-
                 String authenticatedIDP = OAuth2Util.getAuthenticatedIDP(tokenToCache.getAuthzUser());
                 OAuthCacheKey cacheKey = getOAuthCacheKey(scope, tokenToCache.getConsumerKey(), userId,
                         authenticatedIDP, getTokenBindingReference(tokenToCache), authorizedOrganization);
