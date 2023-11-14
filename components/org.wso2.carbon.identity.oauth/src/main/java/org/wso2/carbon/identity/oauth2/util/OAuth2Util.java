@@ -5120,8 +5120,7 @@ public class OAuth2Util {
         }
         try {
             return authenticatedUser.getUserId();
-        }
-        catch (UserIdNotFoundException e) {
+        } catch (UserIdNotFoundException e) {
             throw new IdentityOAuth2Exception("User id is not available for user: " +
                     authenticatedUser.getLoggableUserId(), e);
         }

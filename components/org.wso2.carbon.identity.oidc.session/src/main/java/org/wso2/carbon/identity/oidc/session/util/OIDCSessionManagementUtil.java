@@ -250,7 +250,8 @@ public class OIDCSessionManagementUtil {
                                 if (PrivilegedCarbonContext.getThreadLocalCarbonContext().getOrganizationId() != null) {
                                     servletCookie.setPath("/o/" + tenantDomain + "/");
                                 } else {
-                                    servletCookie.setPath(FrameworkConstants.TENANT_CONTEXT_PREFIX + tenantDomain + "/");
+                                    servletCookie.setPath(
+                                            FrameworkConstants.TENANT_CONTEXT_PREFIX + tenantDomain + "/");
                                 }
                             }
                         } else {
