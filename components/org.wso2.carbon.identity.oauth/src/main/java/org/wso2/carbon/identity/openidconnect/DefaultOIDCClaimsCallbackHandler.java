@@ -157,7 +157,9 @@ public class DefaultOIDCClaimsCallbackHandler implements CustomClaimsCallbackHan
         // Get any user attributes that were cached against the access token
         // Map<(http://wso2.org/claims/email, email), "peter@example.com">
         Map<ClaimMapping, String> userAttributes = getCachedUserAttributes(requestMsgCtx);
-        if (isEmpty(userAttributes) && isLocalUser(requestMsgCtx.getAuthorizedUser())) {
+        if (userAttributes.isEmpty() &&
+                (isLocalUser(requestMsgCtx.getAuthorizedUser())
+                        || "SSO".equals(requestMsgCtx.getAuthorizedUser().getFederatedIdPName()))) {
             if (log.isDebugEnabled()) {
                 log.debug("User attributes not found in cache against the access token or authorization code. " +
                         "Retrieving claims for local user: " + requestMsgCtx.getAuthorizedUser() + " from userstore.");
@@ -531,6 +533,7 @@ public class DefaultOIDCClaimsCallbackHandler implements CustomClaimsCallbackHan
             }
             return userClaimsMappedToOIDCDialect;
         }
+        boolean isOrganizationSwitchedB2BUser = false;
         String fullQualifiedUsername = authenticatedUser.toFullQualifiedUsername();
         String userTenantDomain = authenticatedUser.getTenantDomain();
         String userResidentTenantDomain = userTenantDomain;
@@ -541,13 +544,18 @@ public class DefaultOIDCClaimsCallbackHandler implements CustomClaimsCallbackHan
         /* For B2B users, the resident organization is available to find the tenant where the user's identity is
         managed. Hence, the correct tenant domain should be used to fetch user claims. */
         if (!StringUtils.equals(userTenantDomain, userResidentTenantDomain)) {
-            AbstractUserStoreManager userStoreManager =
-                    (AbstractUserStoreManager) OAuthComponentServiceHolder.getInstance().getRealmService()
-                            .getTenantUserRealm(IdentityTenantUtil.getTenantId(userResidentTenantDomain))
-                            .getUserStoreManager();
             userTenantDomain = userResidentTenantDomain;
-            fullQualifiedUsername = userStoreManager.getUser(authenticatedUser.getUserId(), null)
-                    .getFullQualifiedUsername();
+            if (!authenticatedUser.isFederatedUser()) {
+                AbstractUserStoreManager userStoreManager =
+                        (AbstractUserStoreManager) OAuthComponentServiceHolder.getInstance().getRealmService()
+                                .getTenantUserRealm(IdentityTenantUtil.getTenantId(userResidentTenantDomain))
+                                .getUserStoreManager();
+                fullQualifiedUsername = userStoreManager.getUser(authenticatedUser.getUserId(), null)
+                        .getFullQualifiedUsername();
+            } else {
+                isOrganizationSwitchedB2BUser = true;
+                fullQualifiedUsername = null;
+            }
         }
         UserRealm realm = IdentityTenantUtil.getRealm(userTenantDomain, fullQualifiedUsername);
         if (realm == null) {
@@ -565,7 +573,13 @@ public class DefaultOIDCClaimsCallbackHandler implements CustomClaimsCallbackHan
             requestedClaimUris.remove(APP_ROLES_CLAIM);
             requestedAppRoleClaim = true;
         }
-        Map<String, String> userClaims = getUserClaimsInLocalDialect(fullQualifiedUsername, realm, requestedClaimUris);
+        Map<String, String> userClaims;
+        if (isOrganizationSwitchedB2BUser) {
+            String userId = authenticatedUser.getUserName().split("@")[0];
+            userClaims = getUserClaimsInLocalDialectWithUserID(userId, realm, requestedClaimUris);
+        } else {
+            userClaims = getUserClaimsInLocalDialect(fullQualifiedUsername, realm, requestedClaimUris);
+        }
         if (requestedAppRoleClaim) {
             handleAppRoleClaimInLocalDialect(userClaims, authenticatedUser, serviceProvider.getApplicationResourceId());
         }
@@ -620,12 +634,29 @@ public class DefaultOIDCClaimsCallbackHandler implements CustomClaimsCallbackHan
                         null);
     }
 
+    private Map<String, String> getUserClaimsInLocalDialectWithUserID(String userId,
+                                                                      UserRealm realm,
+                                                                      List<String> claimURIList)
+            throws UserStoreException {
+
+        AbstractUserStoreManager userstore = (AbstractUserStoreManager) realm.getUserStoreManager();
+        if (userstore == null) {
+            throw new UserStoreException("Unable to retrieve UserStoreManager");
+        }
+        Map<String, String> userClaims =
+                userstore.getUserClaimValuesWithID(userId, claimURIList.toArray(new String[0]), null);
+        if (log.isDebugEnabled()) {
+            log.debug("User claims retrieved from user store: " + userClaims.size());
+        }
+        return userClaims;
+    }
+
     /**
      * Adds the application roles claim for local user.
      *
-     * @param userClaims User claims in local dialect.
+     * @param userClaims        User claims in local dialect.
      * @param authenticatedUser Authenticated user.
-     * @param applicationId Application ID.
+     * @param applicationId     Application ID.
      * @throws ApplicationRolesException Error while getting application roles.
      */
     private void handleAppRoleClaimInLocalDialect(Map<String, String> userClaims, AuthenticatedUser authenticatedUser,
